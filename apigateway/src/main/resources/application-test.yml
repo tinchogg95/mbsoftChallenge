@@ -1,0 +1,24 @@
+spring:
+  cloud:
+    gateway:
+      enabled: true
+      routes:
+        - id: test-route
+          uri: http://httpbin.org:80
+          predicates:
+            - Path=/test/**
+          filters:
+            - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+
+eureka:
+  client:
+    enabled: false

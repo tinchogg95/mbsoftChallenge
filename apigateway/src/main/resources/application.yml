@@ -1,0 +1,59 @@
+eureka:
+  client:
+    enabled: false  # Deshabilita completamente Eureka
+    register-with-eureka: false
+    fetch-registry: false
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      enabled: true
+      discovery:
+        locator:
+          enabled: false
+      routes:
+        - id: product-service
+          uri: http://productcodeservice:8081  # Usar nombre del servicio Docker
+          predicates:
+            - Path=/api/product-codes/**
+        - id: medication-service
+          uri: http://medicationservice:8082  # Usar nombre del servicio Docker
+          predicates:
+            - Path=/api/medications/**
+          filters:
+            - name: RewritePath
+              args:
+                regexp: /api/medications/(?<segment>.*)
+                replacement: /api/$\{segment}
+
+# Configuración CORS global (importante para React)
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origins: 
+              - "http://localhost:3000"
+              - "http://frontend:3000"
+            allowed-methods: "*"
+            allowed-headers: "*"
+            allow-credentials: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, gateway
+  endpoint:
+    health:
+      show-details: always
+    gateway:
+      enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web.reactive: INFO
+    reactor.netty: WARN

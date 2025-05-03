@@ -1,0 +1,101 @@
+version: '3.3'
+
+services:
+  # API Gateway (Spring Boot)
+  apigateway:
+    build: 
+      context: ./apigateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+          - SPRING_CLOUD_GATEWAY_ROUTES[0].id=product-service
+          - SPRING_CLOUD_GATEWAY_ROUTES[0].uri=http://productcodeservice:8081
+          - SPRING_CLOUD_GATEWAY_ROUTES[0].predicates[0]=Path=/api/product-codes/**
+          - SPRING_CLOUD_GATEWAY_ROUTES[1].id=medication-service
+          - SPRING_CLOUD_GATEWAY_ROUTES[1].uri=http://medicationservice:8082
+          - SPRING_CLOUD_GATEWAY_ROUTES[1].predicates[0]=Path=/api/medications/**
+          - SPRING_CLOUD_GATEWAY_GLOBALCORS_CORS-CONFIGURATIONS_[/**]_ALLOWED-ORIGINS=http://frontend:3000,http://localhost:3000
+          - SPRING_CLOUD_GATEWAY_GLOBALCORS_CORS-CONFIGURATIONS_[/**]_ALLOWED-METHODS=*
+          - SPRING_CLOUD_GATEWAY_GLOBALCORS_CORS-CONFIGURATIONS_[/**]_ALLOWED-HEADERS=*
+          - SPRING_CLOUD_GATEWAY_GLOBALCORS_CORS-CONFIGURATIONS_[/**]_ALLOW-CREDENTIALS=true
+
+    volumes:
+      - ./apigateway/src:/app/src
+      - ~/.m2:/root/.m2
+    networks:
+      - mbsoft-network
+    restart: unless-stopped
+
+  # Medication Service (Spring Boot)
+  medicationservice:
+    build:
+      context: ./medicationservice
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:h2:file:/data/medicationdb
+    volumes:
+      - ./medicationservice/src:/app/src
+      - medication_data:/data
+      - ~/.m2:/root/.m2
+    networks:
+      - mbsoft-network
+    restart: unless-stopped
+
+  # Product Code Service (Spring Boot)
+  productcodeservice:
+    build:
+      context: ./productcodeservice
+    ports:
+      - "8081:8081"
+      - "8085:8085"
+    environment:
+       - SPRING_DATASOURCE_URL=jdbc:h2:file:/data/productcodedb;DB_CLOSE_ON_EXIT=FALSE;AUTO_SERVER=TRUE
+       - SPRING_DATASOURCE_DRIVER-CLASS-NAME=org.h2.Driver
+       - SPRING_H2_CONSOLE_ENABLED=true
+       - SPRING_H2_CONSOLE_PATH=/h2-console
+    volumes:
+      - ./productcodeservice/src:/app/src
+      - productcode_data:/data
+      - ~/.m2:/root/.m2
+    networks:
+      - mbsoft-network
+    restart: unless-stopped
+
+  # Frontend React (Desarrollo con Hot Reload)
+  frontend:
+    build:
+      context: ./pharmaceutical-frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./pharmaceutical-frontend/src:/app/src
+      - ./pharmaceutical-frontend/public:/app/public
+      - /app/node_modules
+    environment:
+    - REACT_APP_API_BASE_URL=http://apigateway:8080
+    - WDS_SOCKET_PORT=0  # Deshabilita WebSocket para HMR
+    - CHOKIDAR_USEPOLLING=true
+    - WATCHPACK_POLLING=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+     
+    networks:
+      - mbsoft-network
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  medication_data:
+  productcode_data:
+
+networks:
+  mbsoft-network:
+    driver: bridge
